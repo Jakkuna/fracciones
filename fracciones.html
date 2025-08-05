@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Fracciones</title>
+    <style>
+        :root {
+            --color-a: #007bff; --color-b: #dc3545; --color-result: #28a745;
+            --color-negative: #6f42c1; /* Purple for negative results */
+            --color-negative-bg: #dee2e6; /* Light gray for negative magnitude */
+            --color-a-t: rgba(0, 123, 255, 0.6); --color-b-t: rgba(220, 53, 69, 0.6);
+            --color-overlap: #563d7c;
+            --light-bg: #f8f9fa; --white-bg: #ffffff;
+            --text-color: #343a40; --title-color: #0056b3;
+            --border-color: #dee2e6;
+        }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+            line-height: 1.5;
+        }
+        #main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            width: 100%;
+            min-height: 100vh;
+        }
+        #canvas-container {
+            width: 100%;
+            max-width: 900px;
+            height: 400px;
+            background-color: var(--white-bg);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        #fraction-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: default;
+        }
+        #ui-panel {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+        }
+        .control-panel {
+            background-color: var(--white-bg);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            flex: 1;
+            min-width: 280px;
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            color: var(--title-color);
+            margin: 20px 0;
+            font-size: 2.5em;
+        }
+        h3 {
+            text-align: center;
+            color: var(--title-color);
+            margin: 0 0 10px 0;
+            font-size: 1.5em;
+        }
+        .fraction-display {
+            font-size: 2.2em;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            min-height: 50px;
+        }
+        #frac-a-display { color: var(--color-a); }
+        #frac-b-display { color: var(--color-b); }
+        #result-display {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        #result-text {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            color: var(--color-result);
+            min-height: 30px;
+            word-wrap: break-word;
+        }
+        label {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--title-color);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        #sum-button { background-color: var(--color-result); }
+        #sub-button { background-color: #ff851b; }
+        #mul-button { background-color: var(--color-a); }
+        #reset-button {
+            width: 100%;
+            background-color: #ffc107;
+            color: #333;
+            margin-top: 15px;
+        }
+        .instructions {
+            text-align: center;
+            max-width: 900px;
+            margin: 20px 0;
+            font-size: 1.1em;
+            color: var(--text-color);
+        }
+        @media (max-width: 600px) {
+            .control-panel { min-width: 100%; }
+            #canvas-container { height: 300px; }
+            h1 { font-size: 2em; }
+            .fraction-display { font-size: 1.8em; }
+            .button-group { flex-direction: column; }
+            button { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <h1>Explora Fracciones</h1>
+        <div class="instructions">
+            ¡Usa los controles para cambiar las fracciones y ver cómo se suman, restan o multiplican! Las fracciones se muestran como círculos y rejillas para ayudarte a entenderlas.
+        </div>
+        <div id="canvas-container">
+            <canvas id="fraction-canvas" aria-label="Visualización de fracciones"></canvas>
+        </div>
+        <div id="ui-panel">
+            <div class="control-panel">
+                <h3>Fracción A (Azul)</h3>
+                <div id="frac-a-display">1 / 2</div>
+                <label>Numerador: <span id="num-a-value">1</span></label>
+                <input type="range" id="num-a-slider" min="0" max="10" value="1" aria-label="Numerador de la Fracción A">
+                <label>Denominador: <span id="den-a-value">2</span></label>
+                <input type="range" id="den-a-slider" min="1" max="10" value="2" aria-label="Denominador de la Fracción A">
+            </div>
+            <div class="control-panel">
+                <h3>Fracción B (Rojo)</h3>
+                <div id="frac-b-display">1 / 3</div>
+                <label>Numerador: <span id="num-b-value">1</span></label>
+                <input type="range" id="num-b-slider" min="0" max="10" value="1" aria-label="Numerador de la Fracción B">
+                <label>Denominador: <span id="den-b-value">3</span></label>
+                <input type="range" id="den-b-slider" min="1" max="10" value="3" aria-label="Denominador de la Fracción B">
+            </div>
+            <div class="control-panel">
+                <h3>Operaciones</h3>
+                <div class="button-group">
+                    <button id="sum-button" aria-label="Sumar fracciones">Sumar (+)</button>
+                    <button id="sub-button" aria-label="Restar fracciones">Restar (−)</button>
+                    <button id="mul-button" aria-label="Multiplicar fracciones">Multiplicar (×)</button>
+                </div>
+                <div id="result-display">
+                    <h3 style="margin-bottom: 10px;">Resultado</h3>
+                    <div id="result-text" aria-live="polite"></div>
+                </div>
+                <button id="reset-button" aria-label="Reiniciar valores">Reiniciar Todo</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            class Fraction {
+                constructor(num, den) {
+                    this.num = Math.floor(num); // Allow negative numerators
+                    this.den = den === 0 ? 1 : Math.max(1, Math.floor(den));
+                }
+                static gcd(a, b) {
+                    a = Math.abs(a);
+                    b = Math.abs(b);
+                    return b === 0 ? a : Fraction.gcd(b, a % b);
+                }
+                static lcm(a, b) {
+                    return (a * b) / Fraction.gcd(a, b);
+                }
+                simplified() {
+                    const common = Fraction.gcd(this.num, this.den);
+                    return new Fraction(this.num / common, this.den / common);
+                }
+                add(other) {
+                    const lcd = Fraction.lcm(this.den, other.den);
+                    const num = (this.num * (lcd / this.den)) + (other.num * (lcd / other.den));
+                    return new Fraction(num, lcd);
+                }
+                subtract(other) {
+                    const lcd = Fraction.lcm(this.den, other.den);
+                    const num = (this.num * (lcd / this.den)) - (other.num * (lcd / other.den));
+                    return new Fraction(num, lcd);
+                }
+                multiply(other) {
+                    return new Fraction(this.num * other.num, this.den * other.den);
+                }
+                toString() {
+                    return this.num === 0 ? "0" : (this.num < 0 ? "-" : "") + `${Math.abs(this.num)} / ${this.den}`;
+                }
+            }
+
+            const Renderer = {
+                init(canvasEl, colors) {
+                    this.canvas = canvasEl;
+                    this.ctx = this.canvas.getContext('2d');
+                    this.colors = colors;
+                },
+                render(state) {
+                    const dpr = window.devicePixelRatio || 1;
+                    const rect = this.canvas.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) return;
+                    this.canvas.width = rect.width * dpr;
+                    this.canvas.height = rect.height * dpr;
+                    this.ctx.scale(dpr, dpr);
+                    this.cssWidth = rect.width;
+                    this.cssHeight = rect.height;
+                    this.ctx.fillStyle = this.colors.BG;
+                    this.ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
+                    switch (state.mode) {
+                        case 'sum':
+                        case 'sub':
+                            this._drawAddSubState(state);
+                            break;
+                        case 'mul':
+                            this._drawMulState(state);
+                            break;
+                        default:
+                            this._drawIdleState(state);
+                            break;
+                    }
+                },
+                _drawIdleState(state) {
+                    this._drawFractionRow(
+                        state.fracA,
+                        this.cssHeight * 0.3,
+                        this.colors.A,
+                        `Fracción A: ${state.fracA.toString()}`
+                    );
+                    this._drawFractionRow(
+                        state.fracB,
+                        this.cssHeight * 0.7,
+                        this.colors.B,
+                        `Fracción B: ${state.fracB.toString()}`
+                    );
+                },
+                _drawAddSubState(state) {
+                    const lcd = Fraction.lcm(state.fracA.den, state.fracB.den);
+                    const convertedA = new Fraction(
+                        state.fracA.num * (lcd / state.fracA.den),
+                        lcd
+                    );
+                    const convertedB = new Fraction(
+                        state.fracB.num * (lcd / state.fracB.den),
+                        lcd
+                    );
+                    this._drawFractionRow(
+                        state.fracA,
+                        this.cssHeight * 0.2,
+                        this.colors.A,
+                        `A: ${state.fracA.toString()} (es ${convertedA.toString()})`,
+                        lcd
+                    );
+                    this._drawFractionRow(
+                        state.fracB,
+                        this.cssHeight * 0.5,
+                        this.colors.B,
+                        `B: ${state.fracB.toString()} (es ${convertedB.toString()})`,
+                        lcd
+                    );
+                    const resultColor = state.result.num < 0 ? this.colors.Negative : this.colors.Result;
+                    this._drawFractionRow(
+                        state.result,
+                        this.cssHeight * 0.8,
+                        resultColor,
+                        `Resultado: ${state.result.toString()}`
+                    );
+                },
+                _drawMulState(state) {
+                    const margin = { top: 60, right: 60, bottom: 60, left: 60 };
+                    const rectWidth = this.cssWidth - margin.left - margin.right;
+                    const rectHeight = this.cssHeight - margin.top - margin.bottom;
+                    if (rectWidth <= 0 || rectHeight <= 0) return;
+                    const cellHeight = rectHeight / Math.max(1, state.fracA.den);
+                    const cellWidth = rectWidth / Math.max(1, state.fracB.den);
+                    if (!isFinite(cellHeight) || !isFinite(cellWidth)) return;
+                    this.ctx.save();
+                    this.ctx.translate(margin.left, margin.top);
+                    if (state.fracA.num > 0) {
+                        this.ctx.fillStyle = this.colors.A_T;
+                        this.ctx.fillRect(0, 0, rectWidth, state.fracA.num * cellHeight);
+                    }
+                    if (state.fracB.num > 0) {
+                        this.ctx.fillStyle = this.colors.B_T;
+                        this.ctx.fillRect(0, 0, state.fracB.num * cellWidth, rectHeight);
+                    }
+                    if (state.fracA.num > 0 && state.fracB.num > 0) {
+                        this.ctx.fillStyle = this.colors.Overlap;
+                        this.ctx.fillRect(
+                            0,
+                            0,
+                            state.fracB.num * cellWidth,
+                            state.fracA.num * cellHeight
+                        );
+                    }
+                    this.ctx.strokeStyle = '#343a40';
+                    this.ctx.lineWidth = 1;
+                    for (let i = 0; i <= state.fracA.den; i++) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(0, i * cellHeight);
+                        this.ctx.lineTo(rectWidth, i * cellHeight);
+                        this.ctx.stroke();
+                    }
+                    for (let i = 0; i <= state.fracB.den; i++) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(i * cellWidth, 0);
+                        this.ctx.lineTo(i * cellWidth, rectHeight);
+                        this.ctx.stroke();
+                    }
+                    this.ctx.fillStyle = '#000';
+                    this.ctx.font = 'bold 16px sans-serif';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'bottom';
+                    this.ctx.fillText(`${state.fracA.toString()} de las filas`, rectWidth / 2, -15);
+                    this.ctx.save();
+                    this.ctx.translate(-25, rectHeight / 2);
+                    this.ctx.rotate(-Math.PI / 2);
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText(`${state.fracB.toString()} de las columnas`, 0, 0);
+                    this.ctx.restore();
+                    this.ctx.fillStyle = this.colors.Overlap;
+                    this.ctx.font = 'bold 18px sans-serif';
+                    this.ctx.textBaseline = 'top';
+                    const rawResult = state.fracA.multiply(state.fracB);
+                    this.ctx.fillText(
+                        `Resultado: ${rawResult.toString()} = ${state.result.toString()}`,
+                        rectWidth / 2,
+                        rectHeight + 20
+                    );
+                    this.ctx.restore();
+                },
+                _drawFractionRow(fraction, yPos, color, label, subdivision = 0) {
+                    if (!fraction || !isFinite(yPos)) return;
+                    const textMarginLeft = 20;
+                    const textWidth = 200;
+                    this.ctx.fillStyle = '#343a40';
+                    this.ctx.font = 'bold 16px sans-serif';
+                    this.ctx.textAlign = 'left';
+                    this.ctx.textBaseline = 'middle';
+                    const match = label.match(/^(.*?)\s*(\(es.*\))$/);
+                    if (match) {
+                        this.ctx.fillText(match[1], textMarginLeft, yPos - 10);
+                        this.ctx.fillText(match[2], textMarginLeft, yPos + 10);
+                    } else {
+                        this.ctx.fillText(label, textMarginLeft, yPos);
+                    }
+                    if (fraction.num === 0) return;
+                    const radius = Math.min(60, (this.cssWidth - textWidth) / 10);
+                    const spacing = 25;
+                    let wholeParts, fractionalNum, totalCircles;
+                    if (fraction.num < 0) {
+                        wholeParts = Math.floor(Math.abs(fraction.num) / fraction.den);
+                        fractionalNum = Math.abs(fraction.num) % fraction.den;
+                        totalCircles = wholeParts + (fractionalNum > 0 ? 1 : 0);
+                    } else {
+                        wholeParts = Math.floor(fraction.num / fraction.den);
+                        fractionalNum = fraction.num % fraction.den;
+                        totalCircles = wholeParts + (fractionalNum > 0 ? 1 : 0);
+                    }
+                    if (totalCircles === 0) return;
+                    const totalWidth = totalCircles * (radius * 2) + (totalCircles - 1) * spacing;
+                    let startX = this.cssWidth - totalWidth - 20;
+                    for (let i = 0; i < wholeParts; i++) {
+                        this._drawCircle(
+                            startX + radius,
+                            yPos,
+                            radius,
+                            new Fraction(1, 1),
+                            color,
+                            subdivision > 0 ? subdivision / fraction.den : 0
+                        );
+                        startX += (radius * 2) + spacing;
+                    }
+                    if (fractionalNum > 0) {
+                        this._drawCircle(
+                            startX + radius,
+                            yPos,
+                            radius,
+                            new Fraction(fractionalNum, fraction.den),
+                            color,
+                            subdivision
+                        );
+                    }
+                },
+                _drawCircle(x, y, radius, fraction, color, subdivision) {
+                    if (!isFinite(x) || !isFinite(y) || !isFinite(radius) || radius <= 0) return;
+                    const startAngle = -Math.PI / 2;
+                    let endAngle;
+                    if (fraction.num < 0) {
+                        // For negative fractions, fill the entire circle and overlay the magnitude
+                        this.ctx.fillStyle = this.colors.Negative;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x, y);
+                        this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
+                        this.ctx.closePath();
+                        this.ctx.fill();
+                        endAngle = startAngle + (Math.abs(fraction.num) / Math.max(1, fraction.den)) * 2 * Math.PI;
+                        if (isFinite(endAngle)) {
+                            this.ctx.fillStyle = this.colors.NegativeBg;
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, y);
+                            this.ctx.arc(x, y, radius, endAngle, startAngle);
+                            this.ctx.closePath();
+                            this.ctx.fill();
+                        }
+                    } else {
+                        endAngle = startAngle + (fraction.num / Math.max(1, fraction.den)) * 2 * Math.PI;
+                        if (fraction.num > 0 && isFinite(endAngle)) {
+                            this.ctx.fillStyle = color;
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, y);
+                            this.ctx.arc(x, y, radius, startAngle, endAngle);
+                            this.ctx.closePath();
+                            this.ctx.fill();
+                        }
+                    }
+                    this.ctx.strokeStyle = '#343a40';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
+                    this.ctx.stroke();
+                    const maxLines = 10;
+                    const linesToDraw = Math.min(fraction.den, maxLines);
+                    this.ctx.lineWidth = 0.5;
+                    for (let i = 1; i <= linesToDraw; i++) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x, y);
+                        this.ctx.lineTo(
+                            x + radius * Math.cos(startAngle + (i / fraction.den) * 2 * Math.PI),
+                            y + radius * Math.sin(startAngle + (i / fraction.den) * 2 * Math.PI)
+                        );
+                        this.ctx.stroke();
+                    }
+                    if (subdivision > fraction.den) {
+                        const subLinesToDraw = Math.min(subdivision, maxLines);
+                        this.ctx.save();
+                        this.ctx.lineWidth = 0.3;
+                        this.ctx.strokeStyle = 'rgba(52, 58, 64, 0.4)';
+                        for (let i = 1; i <= subLinesToDraw; i++) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, y);
+                            this.ctx.lineTo(
+                                x + radius * Math.cos(startAngle + (i / subdivision) * 2 * Math.PI),
+                                y + radius * Math.sin(startAngle + (i / subdivision) * 2 * Math.PI)
+                            );
+                            this.ctx.stroke();
+                        }
+                        this.ctx.restore();
+                    }
+                }
+            };
+
+            const App = {
+                init() {
+                    this.ui = {
+                        numA: {
+                            slider: document.getElementById('num-a-slider'),
+                            value: document.getElementById('num-a-value')
+                        },
+                        denA: {
+                            slider: document.getElementById('den-a-slider'),
+                            value: document.getElementById('den-a-value')
+                        },
+                        fracADisplay: document.getElementById('frac-a-display'),
+                        numB: {
+                            slider: document.getElementById('num-b-slider'),
+                            value: document.getElementById('num-b-value')
+                        },
+                        denB: {
+                            slider: document.getElementById('den-b-slider'),
+                            value: document.getElementById('den-b-value')
+                        },
+                        fracBDisplay: document.getElementById('frac-b-display'),
+                        sumBtn: document.getElementById('sum-button'),
+                        subBtn: document.getElementById('sub-button'),
+                        mulBtn: document.getElementById('mul-button'),
+                        resetBtn: document.getElementById('reset-button'),
+                        resultText: document.getElementById('result-text')
+                    };
+                    const style = getComputedStyle(document.documentElement);
+                    const colors = {
+                        A: style.getPropertyValue('--color-a').trim(),
+                        B: style.getPropertyValue('--color-b').trim(),
+                        Result: style.getPropertyValue('--color-result').trim(),
+                        Negative: style.getPropertyValue('--color-negative').trim(),
+                        NegativeBg: style.getPropertyValue('--color-negative-bg').trim(),
+                        A_T: style.getPropertyValue('--color-a-t').trim(),
+                        B_T: style.getPropertyValue('--color-b-t').trim(),
+                        Overlap: style.getPropertyValue('--color-overlap').trim(),
+                        BG: style.getPropertyValue('--white-bg').trim()
+                    };
+                    this.state = { mode: 'idle' };
+                    Renderer.init(document.getElementById('fraction-canvas'), colors);
+                    this.addEventListeners();
+                    this.reset();
+                },
+                addEventListeners() {
+                    ['numA', 'denA', 'numB', 'denB'].forEach(key => {
+                        const element = this.ui[key];
+                        if (element && element.slider) {
+                            element.slider.addEventListener('input', () => this.updateAndDraw());
+                        }
+                    });
+                    this.ui.sumBtn.addEventListener('click', () => this.performOperation('sum'));
+                    this.ui.subBtn.addEventListener('click', () => this.performOperation('sub'));
+                    this.ui.mulBtn.addEventListener('click', () => this.performOperation('mul'));
+                    this.ui.resetBtn.addEventListener('click', () => this.reset());
+                    window.addEventListener('resize', () => Renderer.render(this.state));
+                },
+                updateState() {
+                    this.state.fracA = new Fraction(
+                        parseInt(this.ui.numA.slider.value),
+                        parseInt(this.ui.denA.slider.value)
+                    );
+                    this.state.fracB = new Fraction(
+                        parseInt(this.ui.numB.slider.value),
+                        parseInt(this.ui.denB.slider.value)
+                    );
+                    this.ui.numA.value.textContent = this.state.fracA.num;
+                    this.ui.denA.value.textContent = this.state.fracA.den;
+                    this.ui.fracADisplay.textContent = this.state.fracA.toString();
+                    this.ui.numB.value.textContent = this.state.fracB.num;
+                    this.ui.denB.value.textContent = this.state.fracB.den;
+                    this.ui.fracBDisplay.textContent = this.state.fracB.toString();
+                },
+                updateAndDraw() {
+                    this.state.mode = 'idle';
+                    this.ui.resultText.innerHTML = "";
+                    this.updateState();
+                    Renderer.render(this.state);
+                },
+                performOperation(mode) {
+                    this.updateState();
+                    this.state.mode = mode;
+                    let rawResult;
+                    if (mode === 'sum') {
+                        rawResult = this.state.fracA.add(this.state.fracB);
+                    } else if (mode === 'sub') {
+                        rawResult = this.state.fracA.subtract(this.state.fracB);
+                    } else {
+                        rawResult = this.state.fracA.multiply(this.state.fracB);
+                    }
+                    this.state.result = rawResult.simplified();
+                    const opSymbol = mode === 'sum' ? '+' : mode === 'sub' ? '−' : '×';
+                    const explanation = mode === 'sum' || mode === 'sub'
+                        ? `Para ${mode === 'sum' ? 'sumar' : 'restar'}, usamos el mínimo común denominador (${Fraction.lcm(this.state.fracA.den, this.state.fracB.den)}). Un resultado negativo se muestra con un círculo completo púrpura y la magnitud en gris.`
+                        : `Para multiplicar, multiplicamos numeradores (${this.state.fracA.num} × ${this.state.fracB.num}) y denominadores (${this.state.fracA.den} × ${this.state.fracB.den}).`;
+                    this.ui.resultText.innerHTML = `
+                        <div><sup>${this.state.fracA.num}</sup>⁄<sub>${this.state.fracA.den}</sub> ${opSymbol} <sup>${this.state.fracB.num}</sup>⁄<sub>${this.state.fracB.den}</sub> = <b>${this.state.result.toString()}</b></div>
+                        <div style="font-size: 0.9em; margin-top: 10px;">${explanation}</div>
+                    `;
+                    Renderer.render(this.state);
+                },
+                reset() {
+                    this.ui.numA.slider.value = 1;
+                    this.ui.denA.slider.value = 2;
+                    this.ui.numB.slider.value = 1;
+                    this.ui.denB.slider.value = 3;
+                    this.updateAndDraw();
+                }
+            };
+
+            App.init();
+        });
+    </script>
+</body>
+</html>
